@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package pb;
+option go_package="pb/raft";
+
+service Raft {
+    rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse) {}
+    rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse) {}
+}
+
+message LogEntry {
+
+}
+
+message RequestVoteRequest {
+    int32 Term = 1;
+    string CandidateID = 2;
+    int32 LastLogIndex = 3;
+    int32 LastLogTerm = 4;
+}
+
+message RequestVoteResponse {
+    int32 Term = 1;
+    bool VoteGranted = 2;
+}
+
+message AppendEntriesRequest {
+    int32 Term = 1;
+    string LeaderID = 2;
+    int32 PrevLogIndex = 3;
+    int32 PrevLogTerm = 4;
+    repeated LogEntry Entries = 5;
+    int32 LeaderCommit = 6;
+}
+
+message AppendEntriesResponse {
+    int32 Term = 1;
+    bool success = 2;
+}
