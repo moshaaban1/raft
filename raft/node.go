@@ -34,15 +34,19 @@ type RaftNode struct {
 	// Leader state
 	nextIndex  any
 	matchIndex any
+	logger     *slog.Logger
 }
 
 func NewRaftNode(cfg *config.Config) *RaftNode {
-	slog.Info("Initialize a new Raft Node")
+	logger := slog.With("node_id", cfg.NodeID)
+
+	logger.Info("Initialize a new Raft Node")
 
 	grpcClient := client.NewClient(cfg.GetOtherPeers())
 
 	return &RaftNode{
 		client:      grpcClient,
+		logger:      logger,
 		cfg:         cfg,
 		state:       FollowerState,
 		currentTerm: 0,
@@ -60,7 +64,7 @@ func (n *RaftNode) Bootstrap() {
 
 func (n *RaftNode) startElectionTimeout() {
 	if n.getCurrentState() == LeaderState {
-		slog.Error("Can't start a new election while currenct node is leader")
+		n.logger.Error("can't start a new election while currenct node is leader")
 		return
 	}
 
@@ -71,7 +75,7 @@ func (n *RaftNode) resetElectionTimeout() {
 	// TODO: Only if node is follower
 	// Wrap timer with nil check
 	if n.getCurrentState() == LeaderState {
-		slog.Error("Can't start a new election while currenct node is leader")
+		n.logger.Error("can't start a new election while currenct node is leader")
 		return
 	}
 
@@ -80,7 +84,7 @@ func (n *RaftNode) resetElectionTimeout() {
 
 func (n *RaftNode) startHeartbeatInterval() {
 	if n.getCurrentState() != LeaderState {
-		slog.Error("Only leader can send heart beat requests to peers")
+		n.logger.Error("only leader can send heart beat requests to peers")
 		return
 	}
 
@@ -105,7 +109,7 @@ func (n *RaftNode) becomeLeader() {
 
 	// Only Candidates may transition to Leader.
 	if n.state != CandidateState {
-		slog.Info("Only candidate can become a leader")
+		n.logger.Info("only candidate can become a leader")
 		return
 	}
 
@@ -113,7 +117,7 @@ func (n *RaftNode) becomeLeader() {
 
 	n.mu.Unlock()
 
-	slog.Info(fmt.Sprintf("Candidate became leader for term %d", n.currentTerm))
+	n.logger.Info(fmt.Sprintf("candidate became leader for term %d", n.currentTerm))
 
 	n.startHeartbeatInterval()
 }
@@ -132,7 +136,7 @@ func (n *RaftNode) stepDown(term int32) {
 			n.heartbeatCtxCancel = nil
 		}
 
-		slog.Info(fmt.Sprintf("Stepped down to follower, updated term to %d", term))
+		n.logger.Info(fmt.Sprintf("stepped down to follower, updated term to %d", term))
 	}
 }
 
@@ -144,12 +148,10 @@ func (n *RaftNode) isCandidateAtTerm(term int32) bool {
 }
 
 func (n *RaftNode) HandleRequestVote(candidateID string, candidateTerm int32, logIndex int32, logTerm int32) (bool, int32) {
-	slog.Info(fmt.Sprintf("recieved a request vote from candidateID: %s for term %d", candidateID, candidateTerm))
+	n.logger.Info(fmt.Sprintf("recieved a request vote from candidateID: %s for term %d", candidateID, candidateTerm))
 
 	n.mu.Lock()
 	defer n.mu.Unlock()
-
-	fmt.Println(candidateID, candidateTerm, n.currentTerm, n.state, n.votedFor)
 
 	if candidateTerm < n.currentTerm {
 		return false, n.currentTerm

@@ -3,7 +3,6 @@ package raft
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 )
 
@@ -21,8 +20,7 @@ func (n *RaftNode) startNewElection() {
 	defer cancel()
 
 	ec := n.prepareElection()
-
-	slog.Info("Start a new election", "Term", n.currentTerm)
+	n.logger.Info("start a new election", "term", n.currentTerm)
 
 	peers := n.cfg.GetOtherPeers()
 	voteChan := make(chan bool, len(peers))
@@ -63,7 +61,7 @@ func (n *RaftNode) requestVoteFromPeer(ctx context.Context, peerID string, ec *e
 	}
 
 	if resp.VoteGranted {
-		slog.Info(fmt.Sprintf("Vote granted from peer: %s", peerID))
+		n.logger.Info(fmt.Sprintf("vote granted from peer: %s", peerID))
 	}
 
 	return resp.VoteGranted, nil
@@ -78,7 +76,7 @@ func (n *RaftNode) sendElectionRequestVoteToPeers(electionCtx context.Context, e
 
 			granted, err := n.requestVoteFromPeer(rpcCtx, peerId, ec)
 			if err != nil {
-				slog.Error(err.Error())
+				n.logger.Error(err.Error(), "peer_id", peerId)
 				voteChan <- false
 				return
 			}
@@ -128,14 +126,14 @@ func (n *RaftNode) isRecivedMajorityVotes(votes int) bool {
 func (n *RaftNode) evaluateElectionResult(ec *electionContext, votes int) {
 	if n.isRecivedMajorityVotes(votes) && n.isCandidateAtTerm(ec.term) {
 
-		slog.Info(fmt.Sprintf("Candidate won the election - term: %d", ec.term))
+		n.logger.Info("candidate won the election", "term", ec.term)
 
 		n.becomeLeader()
 
 		return
 	}
 
-	slog.Info(fmt.Sprintf("Election either end with no winner or candidate los the election for term: %d", ec.term))
+	n.logger.Info("election either end with no winner or candidate los the election", "term", ec.term)
 
 	// Start a new election with a randamized timer to prevent split votes
 	n.startElectionTimeout()

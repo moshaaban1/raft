@@ -19,9 +19,8 @@ func NewClient(peers map[string]string) *GRPCClient {
 
 	clients := make(map[string]raft.RaftClient, len(peers))
 
-	// TODO:
 	for ID, Address := range peers {
-		conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient(Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			slog.Error(err.Error())
 			return nil
