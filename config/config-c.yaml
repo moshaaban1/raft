@@ -1,0 +1,13 @@
+node_id: node-3
+port: :50053
+
+peers:
+  node-1: localhost:50051
+  node-2: localhost:50052
+  node-3: localhost:50053
+
+election_timeout_min: 1000
+election_timeout_max: 2000
+heartbeat_interval: 300ms
+
+data_dir: ./data/node-3

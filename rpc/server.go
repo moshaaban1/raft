@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"net"
@@ -51,7 +50,6 @@ func (s *GRPCServer) AppendEntries(ctx context.Context, pb *raft.AppendEntriesRe
 }
 
 func (s *GRPCServer) RequestVote(ctx context.Context, pb *raft.RequestVoteRequest) (*raft.RequestVoteResponse, error) {
-	fmt.Println(s.node)
 	voteGranted, term := s.node.HandleRequestVote(pb.GetCandidateID(), pb.GetTerm(), pb.GetLastLogIndex(), pb.GetLastLogTerm())
 
 	return &raft.RequestVoteResponse{

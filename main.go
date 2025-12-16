@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"log/slog"
@@ -23,11 +24,12 @@ func main() {
 }
 
 func loadConfig() *config.Config {
-	filePath := "./config/config.yaml"
+	filePath := flag.String("config", "./config/config-a.yaml", "config file path")
+	flag.Parse()
 
-	slog.Info(fmt.Sprintf("Loading config file %s", filePath))
+	slog.Info(fmt.Sprintf("Loading config file %s", *filePath))
 
-	cfg, err := config.Load(filePath)
+	cfg, err := config.Load(*filePath)
 	if err != nil {
 		log.Fatal(err)
 	}
