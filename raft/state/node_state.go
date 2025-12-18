@@ -1,4 +1,4 @@
-package raft
+package state
 
 type NodeState int
 
