@@ -75,7 +75,7 @@ func (n *RaftNode) resetElectionTimeout() {
 	// TODO: Only if node is follower
 	// Wrap timer with nil check
 	if n.getCurrentState() == LeaderState {
-		n.logger.Error("can't start a new election while currenct node is leader")
+		n.logger.Debug("can't start a new election while currenct node is leader")
 		return
 	}
 
@@ -84,7 +84,7 @@ func (n *RaftNode) resetElectionTimeout() {
 
 func (n *RaftNode) startHeartbeatInterval() {
 	if n.getCurrentState() != LeaderState {
-		n.logger.Error("only leader can send heart beat requests to peers")
+		n.logger.Debug("only leader can send heart beat requests to peers")
 		return
 	}
 
