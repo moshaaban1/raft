@@ -43,10 +43,8 @@ func (s *GRPCServer) Start(port string, server *GRPCServer) {
 func (s *GRPCServer) Stop() {
 }
 
-func (s *GRPCServer) AppendEntries(ctx context.Context, pb *raft.AppendEntriesRequest) (*raft.AppendEntriesResponse, error) {
-	// s.node.HandleAppendEntries()
-
-	return &raft.AppendEntriesResponse{}, nil
+func (s *GRPCServer) AppendEntries(ctx context.Context, req *raft.AppendEntriesRequest) (*raft.AppendEntriesResponse, error) {
+	return s.node.HandleAppendEntries(req)
 }
 
 func (s *GRPCServer) RequestVote(ctx context.Context, pb *raft.RequestVoteRequest) (*raft.RequestVoteResponse, error) {

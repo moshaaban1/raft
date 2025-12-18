@@ -136,5 +136,5 @@ func (n *RaftNode) evaluateElectionResult(ec *electionContext, votes int) {
 	n.logger.Info("election either end with no winner or candidate los the election", "term", ec.term)
 
 	// Start a new election with a randamized timer to prevent split votes
-	n.startElectionTimeout()
+	n.resetElectionTimeout()
 }

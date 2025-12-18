@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/mohamedshaaban/raft/config"
+	"github.com/mohamedshaaban/raft/pb/raft"
+	"github.com/mohamedshaaban/raft/raft"
 	"github.com/mohamedshaaban/raft/rpc/client"
 )
 
@@ -72,8 +74,6 @@ func (n *RaftNode) startElectionTimeout() {
 }
 
 func (n *RaftNode) resetElectionTimeout() {
-	// TODO: Only if node is follower
-	// Wrap timer with nil check
 	if n.getCurrentState() == LeaderState {
 		n.logger.Debug("can't start a new election while currenct node is leader")
 		return
@@ -88,13 +88,16 @@ func (n *RaftNode) startHeartbeatInterval() {
 		return
 	}
 
+	// TODO: add context timeout duration
 	ctx, cancel := context.WithCancel(context.Background())
 
 	n.mu.Lock()
 	n.heartbeatCtxCancel = cancel
 	n.mu.Unlock()
 
-	startTicker(ctx, n.cfg.HeartbeatInterval, func() {})
+	startTicker(ctx, n.cfg.HeartbeatInterval, func() {
+		n.appendEntriesToPeers(ctx)
+	})
 }
 
 func (n *RaftNode) getCurrentState() NodeState {
@@ -102,6 +105,13 @@ func (n *RaftNode) getCurrentState() NodeState {
 	defer n.mu.Unlock()
 
 	return n.state
+}
+
+func (n *RaftNode) getCurrentTerm() int32 {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	return n.currentTerm
 }
 
 func (n *RaftNode) becomeLeader() {
@@ -153,11 +163,7 @@ func (n *RaftNode) HandleRequestVote(candidateID string, candidateTerm int32, lo
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if candidateTerm < n.currentTerm {
-		return false, n.currentTerm
-	}
-
-	if n.votedFor != "" && n.votedFor != candidateID {
+	if candidateTerm < n.currentTerm || n.votedFor != "" && n.votedFor != candidateID {
 		return false, n.currentTerm
 	}
 
@@ -166,14 +172,17 @@ func (n *RaftNode) HandleRequestVote(candidateID string, candidateTerm int32, lo
 		n.stepDown(candidateTerm)
 		n.mu.Lock()
 	}
+
 	// TODO: is log updated
+	// if yes, grant vote to candidate
 
 	n.votedFor = candidateID
-	// n.resetElectionTimeout()
+	n.resetElectionTimeout()
 
 	return true, n.currentTerm
 }
 
 // AppendEntries appends log entries and also serves as a heartbeat to indicate that the leader is alive.
-func (n *RaftNode) HandleAppendEntries() {
+func (n *RaftNode) HandleAppendEntries(req *raft.AppendEntriesRequest) (*raft.AppendEntriesResponse, error) {
+	return &raft.AppendEntriesResponse{Term: 1, Success: true}, nil
 }

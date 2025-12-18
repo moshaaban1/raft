@@ -60,4 +60,17 @@ func (c *GRPCClient) SendRequestVote(ctx context.Context, peerID string, candida
 	return res, nil
 }
 
-func (c *GRPCClient) SendAppendEntries() {}
+func (c *GRPCClient) SendAppendEntries(ctx context.Context, peerID string, req *raft.AppendEntriesRequest) (*raft.AppendEntriesResponse, error) {
+	conn := c.conns[peerID]
+
+	if conn == nil {
+		slog.Error(fmt.Sprintf("failed to find a connection to peerID: %s", peerID))
+	}
+
+	res, err := conn.AppendEntries(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
