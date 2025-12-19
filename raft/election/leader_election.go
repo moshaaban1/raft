@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mohamedshaaban/raft/config"
+	"github.com/mohamedshaaban/raft/raft/interfaces"
 	"github.com/mohamedshaaban/raft/raft/state"
 	"github.com/mohamedshaaban/raft/rpc/client"
 )
@@ -20,12 +21,13 @@ type electionContext struct {
 }
 
 type LeaderElection struct {
-	cfg    *config.Config
-	client *client.GRPCClient
-	state  *state.State
-	mu     sync.Mutex
-	logger *slog.Logger
-	timer  *time.Timer
+	heartbeatManager interfaces.HeartbeatManager
+	cfg              *config.Config
+	client           *client.GRPCClient
+	state            *state.State
+	mu               sync.Mutex
+	logger           *slog.Logger
+	timer            *time.Timer
 }
 
 func NewLeaderElection(grpClient *client.GRPCClient, cfg *config.Config, state *state.State) *LeaderElection {
@@ -39,12 +41,16 @@ func NewLeaderElection(grpClient *client.GRPCClient, cfg *config.Config, state *
 	}
 }
 
+func (le *LeaderElection) SetHeartbeatManager(i interfaces.HeartbeatManager) {
+	le.heartbeatManager = i
+}
+
 func (le *LeaderElection) StartElectionTimeout() {
 	le.mu.Lock()
 	defer le.mu.Unlock()
 
-	if le.state.IsLeader() {
-		le.logger.Error("can't start a new election while current node is leader")
+	if !le.state.IsFollower() {
+		le.logger.Error("Only followers node can start election timer")
 		return
 	}
 
@@ -60,8 +66,8 @@ func (le *LeaderElection) ResetElectionTimeout() {
 	timer := le.timer
 	le.mu.Unlock()
 
-	if le.state.IsLeader() {
-		le.logger.Debug("can't start a new election while current node is leader")
+	if !le.state.IsFollower() {
+		le.logger.Error("Only followers node can start election timer")
 		return
 	}
 
@@ -112,6 +118,8 @@ func (le *LeaderElection) requestVoteFromPeer(ctx context.Context, peerID string
 	// Higher term discovered
 	if resp.Term > ec.term {
 		if le.state.StepDown(resp.Term) {
+			// Peer responds with higher term (they're ahead)
+			// But you haven't received any AppendEntries or RequestVote FROM them as a follower yet
 			le.ResetElectionTimeout() // stepped down, reset
 		}
 		// If false, someone else already stepped down and reset
@@ -177,17 +185,20 @@ func (le *LeaderElection) isRecivedMajorityVotes(votes int) bool {
 }
 
 func (le *LeaderElection) evaluateElectionResult(ec *electionContext, votes int) {
-	if le.isRecivedMajorityVotes(votes) && le.state.IsCandidateAtTerm(ec.term) {
-
-		le.logger.Info("candidate won the election", "term", ec.term)
-
-		le.state.BecomeLeader()
-
+	if !le.isRecivedMajorityVotes(votes) {
+		le.logger.Info("election lost - no majority", "term", ec.term)
+		le.ResetElectionTimeout()
 		return
 	}
 
-	le.logger.Info("election either end with no winner or candidate los the election", "term", ec.term)
+	// Won majority - try to become leader
+	if le.state.BecomeLeader(ec.term) {
+		le.logger.Info("won election, became leader", "term", ec.term)
+		le.heartbeatManager.StartHeartbeat()
+		return
+	}
 
-	// Start a new election with a randamized timer to prevent split votes
+	// Won votes but can't become leader (state changed)
+	le.logger.Info("won majority but no longer candidate", "term", ec.term)
 	le.ResetElectionTimeout()
 }
