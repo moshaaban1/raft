@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -191,14 +190,4 @@ func (le *LeaderElection) evaluateElectionResult(ec *electionContext, votes int)
 
 	// Start a new election with a randamized timer to prevent split votes
 	le.ResetElectionTimeout()
-}
-
-func randamNumber(min int, max int) int {
-	return rand.Intn(max-min+1) + min
-}
-
-func (le *LeaderElection) randamDurationTimeout() time.Duration {
-	randamDurationTimeout := randamNumber(le.cfg.ElectionTimeoutMin, le.cfg.ElectionTimeoutMax)
-
-	return time.Duration(randamDurationTimeout) * time.Millisecond
 }
