@@ -35,46 +35,42 @@ func NewState() *State {
 	}
 }
 
-func (n *State) CurrentState() NodeState {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+func (s *State) CurrentState() NodeState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	return n.state
+	return s.state
 }
 
-func (n *State) CurrentTerm() int32 {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+func (s *State) CurrentTerm() int32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	return n.term
+	return s.term
 }
 
-func (n *State) BecomeLeader() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+func (s *State) BecomeLeader(candidateTerm int32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	// Only Candidates may transition to Leader.
-	// if n.state != CandidateState {
-	// 	n.logger.Info("only candidate can become a leader")
-	//
-	// 	return
-	// }
+	if s.state != CandidateState || s.term != candidateTerm {
+		return false
+	}
 
-	n.state = LeaderState
+	s.state = LeaderState
 
-	// n.logger.Info(fmt.Sprintf("candidate became leader for term %d", n.currentTerm))
-
-	// n.startHeartbeatInterval()
+	return true
 }
 
-func (n *State) StepDown(term int32) bool {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+func (s *State) StepDown(term int32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if term > n.term {
-		n.term = term
-		n.state = FollowerState
-		n.votedFor = ""
+	if term > s.term {
+		s.term = term
+		s.state = FollowerState
+		s.votedFor = ""
 
 		return true
 	}
@@ -82,11 +78,11 @@ func (n *State) StepDown(term int32) bool {
 	return false
 }
 
-func (n *State) IsCandidateAtTerm(term int32) bool {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+func (s *State) IsCandidateAtTerm(term int32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	return n.state == CandidateState && n.term == term
+	return s.state == CandidateState && s.term == term
 }
 
 func (s *State) IsLeader() bool {
@@ -94,6 +90,13 @@ func (s *State) IsLeader() bool {
 	defer s.mu.Unlock()
 
 	return s.state == LeaderState
+}
+
+func (s *State) IsFollower() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.state == FollowerState
 }
 
 func (s *State) PrepareElection(candidateID string) int32 {
