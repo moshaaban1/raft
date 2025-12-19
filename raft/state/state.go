@@ -104,3 +104,33 @@ func (s *State) PrepareElection(candidateID string) int32 {
 	s.votedFor = candidateID
 	return s.term
 }
+
+func (s *State) TryGrantVote(candidateID string, candidateTerm int32, logOk bool) (bool, int32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Reject if candidate's term is outdated
+	if candidateTerm < s.term {
+		return false, s.term
+	}
+
+	// Step down if candidate has higher term
+	if candidateTerm > s.term {
+		s.term = candidateTerm
+		s.state = FollowerState
+		s.votedFor = ""
+	}
+
+	// Reject if already voted for someone else this term
+	if s.votedFor != "" && s.votedFor != candidateID {
+		return false, s.term
+	}
+
+	// Reject if candidate's log is not up-to-date
+	if !logOk {
+		return false, s.term
+	}
+
+	s.votedFor = candidateID
+	return true, s.term
+}

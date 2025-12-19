@@ -32,3 +32,11 @@ func NewRaftNode(cfg *config.Config) *RaftNode {
 func (n *RaftNode) Bootstrap() {
 	n.le.StartElectionTimeout()
 }
+
+func (n *RaftNode) HandleRequestVote(requestVote *election.RequestVote) (bool, int32) {
+	return n.le.HandleRequestVote(requestVote)
+}
+
+// func (n *RaftNode) HandleAppendEntries(...) (*Response, error) {
+//     return n.replication.HandleAppendEntries(...)
+// }

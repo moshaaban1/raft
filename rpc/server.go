@@ -9,6 +9,7 @@ import (
 	"github.com/mohamedshaaban/raft/config"
 	"github.com/mohamedshaaban/raft/pb/raft"
 	r "github.com/mohamedshaaban/raft/raft"
+	"github.com/mohamedshaaban/raft/raft/election"
 	"google.golang.org/grpc"
 )
 
@@ -44,14 +45,21 @@ func (s *GRPCServer) Stop() {
 }
 
 func (s *GRPCServer) AppendEntries(ctx context.Context, req *raft.AppendEntriesRequest) (*raft.AppendEntriesResponse, error) {
-	return s.node.HandleAppendEntries(req)
+	return nil, nil
 }
 
 func (s *GRPCServer) RequestVote(ctx context.Context, pb *raft.RequestVoteRequest) (*raft.RequestVoteResponse, error) {
-	voteGranted, term := s.node.HandleRequestVote(pb.GetCandidateID(), pb.GetTerm(), pb.GetLastLogIndex(), pb.GetLastLogTerm())
+	req := &election.RequestVoteReq{
+		CandidateID:   pb.CandidateID,
+		CandidateTerm: pb.Term,
+		LastLogTerm:   pb.LastLogTerm,
+		LastLogIndex:  pb.LastLogIndex,
+	}
+
+	resp := s.node.HandleRequestVote(req)
 
 	return &raft.RequestVoteResponse{
-		VoteGranted: voteGranted,
-		Term:        term,
+		VoteGranted: resp.VoteGranted,
+		Term:        resp.Term,
 	}, nil
 }

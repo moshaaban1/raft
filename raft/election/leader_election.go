@@ -171,8 +171,8 @@ func (le *LeaderElection) collectElectionVotes(electionCtx context.Context, ec *
 	return votes
 }
 
-func (n *LeaderElection) isRecivedMajorityVotes(votes int) bool {
-	majority := (len(n.cfg.Peers) / 2) + 1
+func (le *LeaderElection) isRecivedMajorityVotes(votes int) bool {
+	majority := (len(le.cfg.Peers) / 2) + 1
 
 	return votes >= majority
 }
