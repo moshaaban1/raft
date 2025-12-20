@@ -9,6 +9,7 @@ import (
 
 	"github.com/mohamedshaaban/raft/config"
 	"github.com/mohamedshaaban/raft/raft/interfaces"
+	"github.com/mohamedshaaban/raft/raft/log"
 	"github.com/mohamedshaaban/raft/raft/state"
 	"github.com/mohamedshaaban/raft/rpc/client"
 )
@@ -28,9 +29,10 @@ type LeaderElection struct {
 	mu               sync.Mutex
 	logger           *slog.Logger
 	timer            *time.Timer
+	log              *log.Log
 }
 
-func NewLeaderElection(grpClient *client.GRPCClient, cfg *config.Config, state *state.State) *LeaderElection {
+func NewLeaderElection(grpClient *client.GRPCClient, cfg *config.Config, state *state.State, log *log.Log) *LeaderElection {
 	logger := slog.With("node_id", cfg.NodeID)
 
 	return &LeaderElection{
@@ -38,6 +40,7 @@ func NewLeaderElection(grpClient *client.GRPCClient, cfg *config.Config, state *
 		client: grpClient,
 		state:  state,
 		logger: logger,
+		log:    log,
 	}
 }
 
@@ -100,23 +103,24 @@ func (le *LeaderElection) startNewElection() {
 
 func (le *LeaderElection) prepareElection() *electionContext {
 	term := le.state.PrepareElection(le.cfg.NodeID)
+	lastLogEntry := le.log.GetLatestLogInfo()
 
 	return &electionContext{
 		term:         term,
-		lastLogIndex: 0,
-		lastLogTerm:  0,
+		lastLogIndex: lastLogEntry.Index,
+		lastLogTerm:  lastLogEntry.Term,
 		candidateID:  le.cfg.NodeID,
 	}
 }
 
-func (le *LeaderElection) requestVoteFromPeer(ctx context.Context, peerID string, ec *electionContext) (bool, error) {
-	resp, err := le.client.SendRequestVote(ctx, peerID, ec.candidateID, ec.term, ec.lastLogIndex, ec.lastLogTerm)
+func (le *LeaderElection) requestVoteFromPeer(ctx context.Context, peerID string, req *RequestVoteReq) (bool, error) {
+	resp, err := le.client.SendRequestVote(ctx, peerID, req)
 	if err != nil {
 		return false, err
 	}
 
 	// Higher term discovered
-	if resp.Term > ec.term {
+	if resp.Term > req.CandidateTerm {
 		if le.state.StepDown(resp.Term) {
 			// Peer responds with higher term (they're ahead)
 			// But you haven't received any AppendEntries or RequestVote FROM them as a follower yet
@@ -134,13 +138,20 @@ func (le *LeaderElection) requestVoteFromPeer(ctx context.Context, peerID string
 }
 
 func (le *LeaderElection) sendElectionRequestVoteToPeers(electionCtx context.Context, ec *electionContext, peers map[string]string, voteChan chan<- bool) {
+	req := &RequestVoteReq{
+		CandidateID:   ec.candidateID,
+		CandidateTerm: ec.term,
+		LastLogIndex:  ec.lastLogIndex,
+		LastLogTerm:   ec.lastLogIndex,
+	}
+
 	for ID := range peers {
 		go func(peerId string) {
 			rpcCtx, cancel := context.WithTimeout(electionCtx, 150*time.Millisecond)
 
 			defer cancel()
 
-			granted, err := le.requestVoteFromPeer(rpcCtx, peerId, ec)
+			granted, err := le.requestVoteFromPeer(rpcCtx, peerId, req)
 			if err != nil {
 				le.logger.Error(err.Error(), "peer_id", peerId)
 				voteChan <- false

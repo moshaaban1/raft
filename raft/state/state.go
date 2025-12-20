@@ -13,14 +13,12 @@ type State struct {
 	// It should be updated on a stable storage before responsing to RPCs
 	term     int32
 	votedFor string
-	log      []LogEntry
 
+	// Index of highest log entry applied to state machine (initialized to 0, increases monotonically)
 	lastApplied uint
-	commitIndex uint
 
-	// Leader state
-	nextIndex  any
-	matchIndex any
+	// Index of highest log entry known to be committed (initialized to 0, increases monotonically)
+	commitIndex int32
 }
 
 func NewState() *State {
@@ -28,10 +26,7 @@ func NewState() *State {
 		state:       FollowerState,
 		term:        0,
 		lastApplied: 0,
-		log:         make([]LogEntry, 0),
 		commitIndex: 0,
-		nextIndex:   0,
-		matchIndex:  0,
 	}
 }
 
@@ -47,6 +42,13 @@ func (s *State) CurrentTerm() int32 {
 	defer s.mu.Unlock()
 
 	return s.term
+}
+
+func (s *State) CommitIndex() int32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.commitIndex
 }
 
 func (s *State) BecomeLeader(candidateTerm int32) bool {
