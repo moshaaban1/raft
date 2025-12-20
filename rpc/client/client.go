@@ -6,6 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/mohamedshaaban/raft/pb/raft"
+	"github.com/mohamedshaaban/raft/raft/election"
+	"github.com/mohamedshaaban/raft/raft/replication"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -38,21 +40,21 @@ func NewClient(peers map[string]string) *GRPCClient {
 
 func (c *GRPCClient) Close() {}
 
-func (c *GRPCClient) SendRequestVote(ctx context.Context, peerID string, candidateID string, term int32, lastLogIndex int32, lastLogTerm int32) (*raft.RequestVoteResponse, error) {
+func (c *GRPCClient) SendRequestVote(ctx context.Context, peerID string, req *election.RequestVoteReq) (*raft.RequestVoteResponse, error) {
 	conn := c.conns[peerID]
 
 	if conn == nil {
 		slog.Error(fmt.Sprintf("failed to find a connection to peerID: %s", peerID))
 	}
 
-	req := &raft.RequestVoteRequest{
-		CandidateID:  candidateID,
-		Term:         term,
-		LastLogIndex: lastLogIndex,
-		LastLogTerm:  lastLogTerm,
+	protoReq := &raft.RequestVoteRequest{
+		CandidateID:  req.CandidateID,
+		Term:         req.CandidateTerm,
+		LastLogIndex: req.LastLogIndex,
+		LastLogTerm:  req.CandidateTerm,
 	}
 
-	res, err := conn.RequestVote(ctx, req)
+	res, err := conn.RequestVote(ctx, protoReq)
 	if err != nil {
 		return nil, err
 	}
@@ -60,14 +62,22 @@ func (c *GRPCClient) SendRequestVote(ctx context.Context, peerID string, candida
 	return res, nil
 }
 
-func (c *GRPCClient) SendAppendEntries(ctx context.Context, peerID string, req *raft.AppendEntriesRequest) (*raft.AppendEntriesResponse, error) {
+func (c *GRPCClient) SendAppendEntries(ctx context.Context, peerID string, req *replication.AppendEntriesReq) (*raft.AppendEntriesResponse, error) {
 	conn := c.conns[peerID]
 
 	if conn == nil {
 		slog.Error(fmt.Sprintf("failed to find a connection to peerID: %s", peerID))
 	}
 
-	res, err := conn.AppendEntries(ctx, req)
+	protoReq := &raft.AppendEntriesRequest{
+		Term:         req.Term,
+		LeaderID:     req.LeaderID,
+		PrevLogIndex: req.PrevLogIndex,
+		PrevLogTerm:  req.PrevLogTerm,
+		LeaderCommit: req.LeaderCommit,
+	}
+
+	res, err := conn.AppendEntries(ctx, protoReq)
 	if err != nil {
 		return nil, err
 	}
